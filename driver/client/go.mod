@@ -1,4 +1,4 @@
-module github.com/alexcogojocaru/cloud-computing-project/driver
+module github.com/alexcogojocaru/cloud-computing-project/driver-client
 
 go 1.19
 

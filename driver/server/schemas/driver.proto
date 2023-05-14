@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+option go_package = "./driver";
+
+message LocationMetadata {
+    double latitude = 1;
+    double longitude = 2;
+    double radius = 3;
+}
+
+message DriverLocation {
+    string name = 1;
+    double latitude = 2;
+    double longitude = 3;
+    double distance = 4;
+}
+
+message DriverLocationList {
+    repeated DriverLocation locations = 1;
+}
+
+enum DriverStatus {
+    FREE = 0;
+    BUSY = 1;
+}
+
+message DriverStatusMetadata {
+    string name = 1;
+    DriverStatus status = 2;
+}
+
+message Empty {}
+
+service Driver {
+    rpc GetClosest(LocationMetadata) returns (DriverLocationList);
+    rpc GetStatus(DriverStatusMetadata) returns (DriverStatusMetadata);
+    rpc SetStatus(DriverStatusMetadata) returns (Empty);
+}

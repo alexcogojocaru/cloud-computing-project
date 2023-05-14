@@ -4,13 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"math/rand"
 	"sync"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/google/uuid"
 )
 
-const PUBSUB_TOPIC = "rider-streaming"
+const (
+	PUBSUB_TOPIC    = "rider-streaming"
+	LOWER_LATITUDE  = 47.14239230121294
+	UPPER_LATITUDE  = 47.183312148060274
+	LOWER_LONGITUDE = 27.531191096268163
+	UPPER_LONGITUDE = 27.660349147474353
+)
 
 type GeolocationCoordinates struct {
 	Latitude  float64 `json:"latitude"`
@@ -30,20 +37,22 @@ func main() {
 	}
 	defer pubsubClient.Close()
 
-	details, _ := json.Marshal(DriverDetails{
-		ID: uuid.New().String(),
-		Coords: GeolocationCoordinates{
-			Latitude:  30.2,
-			Longitude: 27.1,
-		},
-	})
-
 	var wg sync.WaitGroup
-
 	for i := 0; i < 10; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+
+			latitude := rand.Float64()*(UPPER_LATITUDE-LOWER_LATITUDE) + LOWER_LATITUDE
+			longitude := rand.Float64()*(UPPER_LONGITUDE-LOWER_LONGITUDE) + LOWER_LONGITUDE
+
+			details, _ := json.Marshal(DriverDetails{
+				ID: uuid.New().String(),
+				Coords: GeolocationCoordinates{
+					Latitude:  latitude,
+					Longitude: longitude,
+				},
+			})
 
 			topic := pubsubClient.Topic(PUBSUB_TOPIC)
 			res := topic.Publish(ctx, &pubsub.Message{
