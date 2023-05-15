@@ -1,11 +1,12 @@
-module github.com/alexcogojocaru/cloud-computing-project/driver-client
+module github.com/alexcogojocaru/cloud-computing-project/driver/client
 
 go 1.19
 
 require (
 	cloud.google.com/go/pubsub v1.30.1
-	github.com/distribution/distribution/v3 v3.0.0-20230509223958-8e29e870a4d2
 	github.com/google/uuid v1.3.0
+	google.golang.org/grpc v1.54.0
+	google.golang.org/protobuf v1.30.0
 )
 
 require (
@@ -29,6 +30,4 @@ require (
 	google.golang.org/api v0.122.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
-	google.golang.org/grpc v1.54.0 // indirect
-	google.golang.org/protobuf v1.30.0 // indirect
 )

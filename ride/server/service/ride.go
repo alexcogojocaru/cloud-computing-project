@@ -63,11 +63,7 @@ func NewRideGrpcService(
 }
 
 func (r *RideGrpcService) Start(ctx context.Context, location *pb.LocationMetadata) (*pb.StartRideResponse, error) {
-	driverData, err := r.driverClient.GetClosest(ctx, &pb.LocationMetadata{
-		Latitude:  location.Latitude,
-		Longitude: location.Longitude,
-		Radius:    location.Radius,
-	})
+	driverData, err := r.driverClient.GetClosest(ctx, location)
 	if err != nil {
 		return nil, err
 	}
@@ -96,13 +92,14 @@ func (r *RideGrpcService) Start(ctx context.Context, location *pb.LocationMetada
 		}
 	}
 
+	if closestDriver == nil {
+		return &pb.StartRideResponse{
+			Matched: false,
+		}, nil
+	}
+
 	return &pb.StartRideResponse{
-		Matched: true,
-		Location: &pb.DriverLocation{
-			Name:      closestDriver.Name,
-			Latitude:  closestDriver.Latitude,
-			Longitude: closestDriver.Longitude,
-			Distance:  closestDriver.Distance,
-		},
+		Matched:  true,
+		Location: closestDriver,
 	}, nil
 }

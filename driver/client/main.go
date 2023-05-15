@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"log"
 	"math/rand"
-	"sync"
+	"time"
 
 	"cloud.google.com/go/pubsub"
+	"github.com/alexcogojocaru/cloud-computing-project/driver/client/pb"
 	"github.com/google/uuid"
+	"google.golang.org/grpc"
 )
 
 const (
@@ -37,35 +39,45 @@ func main() {
 	}
 	defer pubsubClient.Close()
 
-	var wg sync.WaitGroup
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	conn, err := grpc.Dial("localhost:8081", grpc.WithInsecure())
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
 
-			latitude := rand.Float64()*(UPPER_LATITUDE-LOWER_LATITUDE) + LOWER_LATITUDE
-			longitude := rand.Float64()*(UPPER_LONGITUDE-LOWER_LONGITUDE) + LOWER_LONGITUDE
+	client := pb.NewDriverClient(conn)
+	drivername := uuid.New().String()
 
-			details, _ := json.Marshal(DriverDetails{
-				ID: uuid.New().String(),
-				Coords: GeolocationCoordinates{
-					Latitude:  latitude,
-					Longitude: longitude,
-				},
-			})
-
-			topic := pubsubClient.Topic(PUBSUB_TOPIC)
-			res := topic.Publish(ctx, &pubsub.Message{
-				Data: details,
-			})
-			id, err := res.Get(ctx)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			log.Println(id)
-		}()
+	_, err = client.SetStatus(ctx, &pb.DriverStatusMetadata{
+		Name:   drivername,
+		Status: pb.DriverStatus_FREE,
+	})
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	wg.Wait()
+	for {
+		latitude := rand.Float64()*(UPPER_LATITUDE-LOWER_LATITUDE) + LOWER_LATITUDE
+		longitude := rand.Float64()*(UPPER_LONGITUDE-LOWER_LONGITUDE) + LOWER_LONGITUDE
+
+		details, _ := json.Marshal(DriverDetails{
+			ID: uuid.New().String(),
+			Coords: GeolocationCoordinates{
+				Latitude:  latitude,
+				Longitude: longitude,
+			},
+		})
+
+		topic := pubsubClient.Topic(PUBSUB_TOPIC)
+		res := topic.Publish(ctx, &pubsub.Message{
+			Data: details,
+		})
+		id, err := res.Get(ctx)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		log.Printf("name=%s pubsubId=%s\n", drivername, id)
+		time.Sleep(10 * time.Second)
+	}
 }

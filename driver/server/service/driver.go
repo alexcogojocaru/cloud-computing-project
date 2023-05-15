@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	pb "github.com/alexcogojocaru/cloud-computing-project/driver/proto-gen/driver"
+	"github.com/alexcogojocaru/cloud-computing-project/driver/pb"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -81,7 +81,9 @@ func (d *DriverGrpcService) GetClosest(ctx context.Context, location *pb.Locatio
 func (d *DriverGrpcService) GetStatus(ctx context.Context, metadata *pb.DriverStatusMetadata) (*pb.DriverStatusMetadata, error) {
 	value, err := d.rdb.Get(ctx, metadata.Name).Result()
 	if err != nil {
-		return nil, err
+		return &pb.DriverStatusMetadata{
+			Status: pb.DriverStatus_UNKNOWN,
+		}, nil
 	}
 
 	var status pb.DriverStatus
@@ -109,6 +111,8 @@ func (d *DriverGrpcService) SetStatus(ctx context.Context, metadata *pb.DriverSt
 	if err != nil {
 		return nil, err
 	}
+
+	d.log.Info("SetStatus", zap.String("drivername", metadata.Name), zap.String("status", metadata.Status.String()))
 
 	return &pb.Empty{}, nil
 }

@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "./driver";
+option go_package = "./pb";
 
 message LocationMetadata {
     double latitude = 1;
@@ -20,8 +20,9 @@ message DriverLocationList {
 }
 
 enum DriverStatus {
-    FREE = 0;
-    BUSY = 1;
+    UNKNOWN = 0;
+    FREE = 1;
+    BUSY = 2;
 }
 
 message DriverStatusMetadata {

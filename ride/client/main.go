@@ -14,9 +14,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer conn.Close()
 
 	client := pb.NewRideClient(conn)
-	defer conn.Close()
 
 	resp, err := client.Start(context.Background(), &pb.LocationMetadata{
 		Latitude:  47.16129960502986,

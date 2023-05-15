@@ -4,7 +4,7 @@
 // - protoc             v3.19.4
 // source: driver.proto
 
-package driver
+package pb
 
 import (
 	context "context"
