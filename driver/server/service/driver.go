@@ -31,15 +31,15 @@ func NewDriverGrpcService(
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
+			lis, err := net.Listen("tcp", ":8081")
+			if err != nil {
+				log.Fatal("Cannot listen to port 8081", zap.Error(err))
+			}
+
+			grpcServer := grpc.NewServer()
+			pb.RegisterDriverServer(grpcServer, d)
+
 			go func() {
-				lis, err := net.Listen("tcp", ":8081")
-				if err != nil {
-					log.Fatal("Cannot listen to port 8081", zap.Error(err))
-				}
-
-				grpcServer := grpc.NewServer()
-				pb.RegisterDriverServer(grpcServer, d)
-
 				log.Info("Starting grpc service...")
 				if err := grpcServer.Serve(lis); err != nil {
 					log.Fatal("Failed to serve", zap.Error(err))

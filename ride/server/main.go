@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/alexcogojocaru/cloud-computing-project/ride/service"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxevent"
 	"go.uber.org/zap"
@@ -13,9 +14,11 @@ func main() {
 		}),
 		fx.Provide(
 			NewRideService,
+			service.NewRideGrpcService,
 			zap.NewExample,
 		), fx.Invoke(
 			func(*RideService) {},
+			func(*service.RideGrpcService) {},
 		),
 	).Run()
 }

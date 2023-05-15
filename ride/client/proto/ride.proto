@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+import "driver.proto";
+
+option go_package = "./pb";
+
+message StartRideResponse {
+    bool matched = 1;
+    DriverLocation location = 2;
+}
+
+service Ride {
+    rpc Start(LocationMetadata) returns (StartRideResponse);
+}
