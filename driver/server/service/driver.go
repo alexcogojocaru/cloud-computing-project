@@ -57,6 +57,7 @@ func NewDriverGrpcService(
 }
 
 func (d *DriverGrpcService) GetClosest(ctx context.Context, location *pb.LocationMetadata) (*pb.DriverLocationList, error) {
+	d.log.Info("Received getClosest request", zap.String("method", "GetClosest"))
 	geoLocations, err := GetClosestDriver(d.rdb, location)
 	if err != nil {
 		return nil, err
@@ -75,15 +76,21 @@ func (d *DriverGrpcService) GetClosest(ctx context.Context, location *pb.Locatio
 		}
 	}
 
+	d.log.Info("Found drivers", zap.Int("size", len(driverLocations.Locations)))
+
 	return driverLocations, nil
 }
 
 func (d *DriverGrpcService) GetStatus(ctx context.Context, metadata *pb.DriverStatusMetadata) (*pb.DriverStatusMetadata, error) {
 	value, err := d.rdb.Get(ctx, metadata.Name).Result()
 	if err != nil {
-		return &pb.DriverStatusMetadata{
-			Status: pb.DriverStatus_UNKNOWN,
-		}, nil
+		// d.log.Warn("No data in redis for driver", zap.String("driver", metadata.Name))
+		// return &pb.DriverStatusMetadata{
+		// 	Status: pb.DriverStatus_UNKNOWN,
+		// }, err
+
+		// for demo purposes, set the driver's status to FREE
+		d.rdb.Set(ctx, metadata.Name, pb.DriverStatus_FREE.String(), 0*time.Second).Err()
 	}
 
 	var status pb.DriverStatus

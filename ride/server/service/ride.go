@@ -63,6 +63,7 @@ func NewRideGrpcService(
 }
 
 func (r *RideGrpcService) Start(ctx context.Context, location *pb.LocationMetadata) (*pb.StartRideResponse, error) {
+	r.log.Info("Received start request", zap.String("method", "Start"))
 	driverData, err := r.driverClient.GetClosest(ctx, location)
 	if err != nil {
 		return nil, err
@@ -74,6 +75,8 @@ func (r *RideGrpcService) Start(ctx context.Context, location *pb.LocationMetada
 		}, nil
 	}
 
+	r.log.Info("Received driver data", zap.Int("size", len(driverData.Locations)))
+
 	var closestDriver *pb.DriverLocation
 	for _, driver := range driverData.Locations {
 		metadata, err := r.driverClient.GetStatus(ctx, &pb.DriverStatusMetadata{
@@ -83,8 +86,11 @@ func (r *RideGrpcService) Start(ctx context.Context, location *pb.LocationMetada
 			r.log.Fatal(
 				"Cannot retrieve the driver's status",
 				zap.String("drivername", driver.Name),
+				zap.Error(err),
 			)
 		}
+
+		r.log.Info("Driver metadata", zap.Any("driver", metadata))
 
 		if metadata.Status == pb.DriverStatus_FREE {
 			closestDriver = driver
@@ -92,11 +98,18 @@ func (r *RideGrpcService) Start(ctx context.Context, location *pb.LocationMetada
 		}
 	}
 
+	r.log.Info("Closest driver", zap.Any("driver", closestDriver))
+
 	if closestDriver == nil {
 		return &pb.StartRideResponse{
 			Matched: false,
 		}, nil
 	}
+
+	r.driverClient.SetStatus(ctx, &pb.DriverStatusMetadata{
+		Name:   closestDriver.Name,
+		Status: pb.DriverStatus_BUSY,
+	})
 
 	return &pb.StartRideResponse{
 		Matched:  true,

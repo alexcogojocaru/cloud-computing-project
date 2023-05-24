@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 
 	"github.com/alexcogojocaru/cloud-computing-project/ride/client/pb"
@@ -27,5 +26,5 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println(resp)
+	log.Println(resp)
 }
