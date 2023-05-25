@@ -3,23 +3,22 @@ version: '3'
 services:
   driver_client:
     image: gcr.io/cloudcomputing-386413/cc-driver-client
+    build: 
+      context: driver/client
     environment:
       - DRIVER_SERVICE_ADDR=driver_server:8081
   
   driver_server:
     image: gcr.io/cloudcomputing-386413/cc-driver-server
+    build: 
+      context: driver/server
     ports:
       - 8081:8081
-    environment:
-      - REDIS_ADDR=redis:6379
 
   ride_server:
     image: gcr.io/cloudcomputing-386413/cc-ride-server
+    build: 
+      context: ride/server
     ports:
       - 8088:8082
-    environment:
-      - REDIS_ADDR=redis:6379
       - DRIVER_ADDR=driver_server:8081
-
-  redis:
-    image: redis:latest

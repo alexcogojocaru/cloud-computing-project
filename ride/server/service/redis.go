@@ -12,11 +12,11 @@ var (
 
 func NewRedisClient() *redis.Client {
 	if REDIS_ADDR == "" {
-		REDIS_ADDR = "localhost:6379"
+		REDIS_ADDR = "redis-17608.c228.us-central1-1.gce.cloud.redislabs.com:17608"
 	}
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     REDIS_ADDR,
-		Password: "",
+		Password: "utq2bf7KKuEj8syRLcmyUeJUExMVvif3",
 	})
 
 	return rdb

@@ -44,7 +44,7 @@ func main() {
 	}
 	defer pubsubClient.Close()
 
-	conn, err := grpc.Dial("cc-driver-server-qqtr4ife4a-lz.a.run.app:443", grpc.WithInsecure())
+	conn, err := grpc.Dial("localhost:8081", grpc.WithInsecure())
 	if err != nil {
 		log.Fatal(err)
 	}
