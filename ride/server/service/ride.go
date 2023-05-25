@@ -2,9 +2,17 @@ package service
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"net"
+	"os"
+	"time"
 
+	"cloud.google.com/go/pubsub"
 	"github.com/alexcogojocaru/cloud-computing-project/ride/proto-gen/pb"
+	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -16,13 +24,37 @@ type RideGrpcService struct {
 	log          *zap.Logger
 	driverConn   *grpc.ClientConn
 	driverClient pb.DriverClient
+	rdb          *redis.Client
+	pubsub       *pubsub.Client
+	firestore    *FirestoreWrapper
 }
+
+type NotificationMessage struct {
+	RideID     string    `json:"rideid"`
+	RiderName  string    `json:"rider"`
+	DriverName string    `json:"driver"`
+	Distance   float64   `json:"distance"`
+	Timestamp  time.Time `json:"timestamp"`
+}
+
+var (
+	DRIVER_ADDR = os.Getenv("DRIVER_ADDR")
+)
 
 func NewRideGrpcService(
 	lc fx.Lifecycle,
 	log *zap.Logger,
 ) *RideGrpcService {
-	conn, err := grpc.Dial("localhost:8081", grpc.WithInsecure())
+	if DRIVER_ADDR == "" {
+		DRIVER_ADDR = "localhost:8081"
+	}
+
+	conn, err := grpc.Dial(DRIVER_ADDR, grpc.WithInsecure())
+	if err != nil {
+		return nil
+	}
+
+	pubsubClient, err := pubsub.NewClient(context.Background(), "cloudcomputing-386413")
 	if err != nil {
 		return nil
 	}
@@ -32,6 +64,9 @@ func NewRideGrpcService(
 		log:          log,
 		driverConn:   conn,
 		driverClient: client,
+		rdb:          NewRedisClient(),
+		pubsub:       pubsubClient,
+		firestore:    NewFirestoreDb(),
 	}
 
 	lc.Append(fx.Hook{
@@ -62,17 +97,16 @@ func NewRideGrpcService(
 	return r
 }
 
-func (r *RideGrpcService) Start(ctx context.Context, location *pb.LocationMetadata) (*pb.StartRideResponse, error) {
+func (r *RideGrpcService) Start(location *pb.StartRideRequest, stream pb.Ride_StartServer) error {
+	ctx := context.Background()
 	r.log.Info("Received start request", zap.String("method", "Start"))
-	driverData, err := r.driverClient.GetClosest(ctx, location)
+	driverData, err := r.driverClient.GetClosest(ctx, location.StartLocation)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if len(driverData.Locations) == 0 {
-		return &pb.StartRideResponse{
-			Matched: false,
-		}, nil
+		return errors.New("No drivers available")
 	}
 
 	r.log.Info("Received driver data", zap.Int("size", len(driverData.Locations)))
@@ -101,9 +135,7 @@ func (r *RideGrpcService) Start(ctx context.Context, location *pb.LocationMetada
 	r.log.Info("Closest driver", zap.Any("driver", closestDriver))
 
 	if closestDriver == nil {
-		return &pb.StartRideResponse{
-			Matched: false,
-		}, nil
+		return errors.New("No free drivers")
 	}
 
 	r.driverClient.SetStatus(ctx, &pb.DriverStatusMetadata{
@@ -111,8 +143,84 @@ func (r *RideGrpcService) Start(ctx context.Context, location *pb.LocationMetada
 		Status: pb.DriverStatus_BUSY,
 	})
 
-	return &pb.StartRideResponse{
+	r.rdb.GeoAdd(ctx, "riders/location", &redis.GeoLocation{
+		Name:      fmt.Sprintf("start-%s", location.Username),
+		Longitude: location.StartLocation.Longitude,
+		Latitude:  location.StartLocation.Latitude,
+	}, &redis.GeoLocation{
+		Name:      fmt.Sprintf("stop-%s", location.Username),
+		Longitude: location.EndLocation.Longitude,
+		Latitude:  location.EndLocation.Latitude,
+	})
+
+	r.log.Info("Starting ride",
+		zap.String("rider", location.Username),
+		zap.String("driver", closestDriver.Name),
+	)
+
+	rideId := uuid.New().String()
+
+	stream.Send(&pb.StartRideResponse{
 		Matched:  true,
 		Location: closestDriver,
-	}, nil
+	})
+
+	startName := fmt.Sprintf("start-%s", location.Username)
+	stopName := fmt.Sprintf("stop-%s", location.Username)
+
+	distance, err := r.rdb.GeoDist(context.Background(), "riders/location", startName, stopName, "km").Result()
+	if err != nil {
+		r.log.Error("Cannot compute the distance", zap.Error(err))
+	}
+
+	r.log.Info("Computed the ride distance", zap.Float64("distance", distance))
+
+	for i := 0; i < int(distance); i++ {
+		err = stream.Send(&pb.StartRideResponse{
+			Matched:  true,
+			Location: closestDriver,
+		})
+		if err != nil {
+			return err
+		}
+
+		r.log.Info("Ongoing ride",
+			zap.String("rider", location.Username),
+			zap.String("driver", closestDriver.Name),
+		)
+
+		time.Sleep(1 * time.Second)
+	}
+
+	r.log.Info("Finished ride",
+		zap.String("rider", location.Username),
+		zap.String("driver", closestDriver.Name),
+	)
+
+	r.driverClient.SetStatus(ctx, &pb.DriverStatusMetadata{
+		Name:   closestDriver.Name,
+		Status: pb.DriverStatus_FREE,
+	})
+
+	msg := NotificationMessage{
+		RideID:     rideId,
+		RiderName:  location.Username,
+		DriverName: closestDriver.Name,
+		Distance:   distance,
+		Timestamp:  time.Now(),
+	}
+	details, _ := json.Marshal(msg)
+	topic := r.pubsub.Topic("notification-stream")
+	res := topic.Publish(ctx, &pubsub.Message{
+		Data: details,
+	})
+	serverid, _ := res.Get(ctx)
+	r.log.Info("PubSub id", zap.String("id", serverid))
+
+	_, _, err = r.firestore.Client.Collection("rides").Add(ctx, msg)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

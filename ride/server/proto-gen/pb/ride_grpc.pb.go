@@ -22,7 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type RideClient interface {
-	Start(ctx context.Context, in *LocationMetadata, opts ...grpc.CallOption) (*StartRideResponse, error)
+	Start(ctx context.Context, in *StartRideRequest, opts ...grpc.CallOption) (Ride_StartClient, error)
 }
 
 type rideClient struct {
@@ -33,20 +33,43 @@ func NewRideClient(cc grpc.ClientConnInterface) RideClient {
 	return &rideClient{cc}
 }
 
-func (c *rideClient) Start(ctx context.Context, in *LocationMetadata, opts ...grpc.CallOption) (*StartRideResponse, error) {
-	out := new(StartRideResponse)
-	err := c.cc.Invoke(ctx, "/Ride/Start", in, out, opts...)
+func (c *rideClient) Start(ctx context.Context, in *StartRideRequest, opts ...grpc.CallOption) (Ride_StartClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Ride_ServiceDesc.Streams[0], "/Ride/Start", opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &rideStartClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Ride_StartClient interface {
+	Recv() (*StartRideResponse, error)
+	grpc.ClientStream
+}
+
+type rideStartClient struct {
+	grpc.ClientStream
+}
+
+func (x *rideStartClient) Recv() (*StartRideResponse, error) {
+	m := new(StartRideResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 // RideServer is the server API for Ride service.
 // All implementations must embed UnimplementedRideServer
 // for forward compatibility
 type RideServer interface {
-	Start(context.Context, *LocationMetadata) (*StartRideResponse, error)
+	Start(*StartRideRequest, Ride_StartServer) error
 	mustEmbedUnimplementedRideServer()
 }
 
@@ -54,8 +77,8 @@ type RideServer interface {
 type UnimplementedRideServer struct {
 }
 
-func (UnimplementedRideServer) Start(context.Context, *LocationMetadata) (*StartRideResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Start not implemented")
+func (UnimplementedRideServer) Start(*StartRideRequest, Ride_StartServer) error {
+	return status.Errorf(codes.Unimplemented, "method Start not implemented")
 }
 func (UnimplementedRideServer) mustEmbedUnimplementedRideServer() {}
 
@@ -70,22 +93,25 @@ func RegisterRideServer(s grpc.ServiceRegistrar, srv RideServer) {
 	s.RegisterService(&Ride_ServiceDesc, srv)
 }
 
-func _Ride_Start_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(LocationMetadata)
-	if err := dec(in); err != nil {
-		return nil, err
+func _Ride_Start_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StartRideRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
 	}
-	if interceptor == nil {
-		return srv.(RideServer).Start(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/Ride/Start",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(RideServer).Start(ctx, req.(*LocationMetadata))
-	}
-	return interceptor(ctx, in, info, handler)
+	return srv.(RideServer).Start(m, &rideStartServer{stream})
+}
+
+type Ride_StartServer interface {
+	Send(*StartRideResponse) error
+	grpc.ServerStream
+}
+
+type rideStartServer struct {
+	grpc.ServerStream
+}
+
+func (x *rideStartServer) Send(m *StartRideResponse) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 // Ride_ServiceDesc is the grpc.ServiceDesc for Ride service.
@@ -94,12 +120,13 @@ func _Ride_Start_Handler(srv interface{}, ctx context.Context, dec func(interfac
 var Ride_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "Ride",
 	HandlerType: (*RideServer)(nil),
-	Methods: []grpc.MethodDesc{
+	Methods:     []grpc.MethodDesc{},
+	Streams: []grpc.StreamDesc{
 		{
-			MethodName: "Start",
-			Handler:    _Ride_Start_Handler,
+			StreamName:    "Start",
+			Handler:       _Ride_Start_Handler,
+			ServerStreams: true,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
 	Metadata: "ride.proto",
 }

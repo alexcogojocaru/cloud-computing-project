@@ -31,7 +31,7 @@ func NewDriverGrpcService(
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			lis, err := net.Listen("tcp", ":8081")
+			lis, err := net.Listen("tcp", "0.0.0.0:8081")
 			if err != nil {
 				log.Fatal("Cannot listen to port 8081", zap.Error(err))
 			}

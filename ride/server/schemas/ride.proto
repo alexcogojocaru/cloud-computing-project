@@ -4,11 +4,17 @@ import "driver.proto";
 
 option go_package = "./pb";
 
+message StartRideRequest {
+    string username = 1;
+    LocationMetadata startLocation = 2;
+    LocationMetadata endLocation = 3;
+}
+
 message StartRideResponse {
     bool matched = 1;
     DriverLocation location = 2;
 }
 
 service Ride {
-    rpc Start(LocationMetadata) returns (StartRideResponse);
+    rpc Start(StartRideRequest) returns (stream StartRideResponse);
 }

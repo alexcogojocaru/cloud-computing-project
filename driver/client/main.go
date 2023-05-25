@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"math/rand"
+	"os"
 	"time"
 
 	"cloud.google.com/go/pubsub"
@@ -31,6 +32,10 @@ type DriverDetails struct {
 	Coords GeolocationCoordinates `json:"coords"`
 }
 
+var (
+	DRIVER_SERVICE_ADDR = os.Getenv("DRIVER_SERVICE_ADDR")
+)
+
 func main() {
 	ctx := context.Background()
 	pubsubClient, err := pubsub.NewClient(ctx, "cloudcomputing-386413")
@@ -39,7 +44,7 @@ func main() {
 	}
 	defer pubsubClient.Close()
 
-	conn, err := grpc.Dial("localhost:8081", grpc.WithInsecure())
+	conn, err := grpc.Dial("cc-driver-server-qqtr4ife4a-lz.a.run.app:443", grpc.WithInsecure())
 	if err != nil {
 		log.Fatal(err)
 	}
